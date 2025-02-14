@@ -1,0 +1,125 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <link href="https://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mediaelement/4.2.7/mediaelementplayer.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Sofia">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+    <div class="music-player">
+        {% for item in page_obj %}
+        <div class="song-item">
+            <!-- Song Cover Image -->
+            <div class="cover">
+                {% if item.image %}
+                    <img alt="{{ item.title }}" src="{{ item.image.url }}">
+                {% else %}
+                    <p>No cover available</p>
+                {% endif %}
+            </div>
+
+            <!-- Song Title and Artist -->
+            <div class="titre">
+                <h3>{{ item.artist }}</h3>
+                <h1>{{ item.title }}</h1>
+            </div>
+            <center>
+                <a href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% endif %}">
+                    <i class="fa fa-step-backward fa-2x"></i>
+                </a>
+                &nbsp; &nbsp; &nbsp;
+                <a href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }} {% endif %}">
+                    <i class="fa fa-step-forward fa-2x"></i>
+                </a>
+            </center>
+            <!-- Audio Player -->
+            <div class="lecteur">
+                <audio class="fc-media" style="width: 100%;" id="fc-media-{{ forloop.counter }}" controls>
+                    <source src="{% if item.audio_file %}{{ item.audio_file.url }}{% else %}{{ item.audio_link }}{% endif %}" type="audio/mp3">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+
+            <!-- Lyrics Container -->
+            <div class="right-section">
+              <div class="lyrics-container">
+                <div class="lyrics">
+                    <p id="song-lyrics-{{ forloop.counter }}" class="song-lyrics" data-lyrics='{{ item.lyrics|escapejs }}'></p>
+                </div>
+              </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script src="{% static 'script.js' %}"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Select all audio elements
+        const audioElements = document.querySelectorAll('.fc-media');
+
+        // Attach event listeners to each audio player
+        audioElements.forEach(audio => {
+            audio.addEventListener('play', function () {
+                // Get the correct lyrics container for the current song
+                const songId = audio.id.split('-').pop(); // Extracts the last part of ID (e.g., "1", "2", etc.)
+                const lyricsContainer = document.getElementById(`song-lyrics-${songId}`);
+
+                if (!lyricsContainer) {
+                    console.error(`Lyrics container not found for song ${songId}`);
+                    return;
+                }
+
+                // Parse the lyrics JSON
+                let lyricsData;
+                try {
+                    lyricsData = JSON.parse(lyricsContainer.getAttribute('data-lyrics'));
+                } catch (error) {
+                    console.error("Error parsing lyrics data:", error);
+                    return;
+                }
+
+                if (!lyricsData || lyricsData.length === 0) {
+                    console.error("Lyrics data is empty or malformed!");
+                    return;
+                }
+
+                let currentLyricIndex = 0;
+
+                // Function to convert timestamp (e.g., "00:11.55") to seconds
+                function timeToSeconds(time) {
+                    if (!time) return 0;
+                    const [minutes, seconds] = time.split(':').map(parseFloat);
+                    return minutes * 60 + seconds;
+                }
+
+                // Function to sync lyrics with audio playback
+                function updateLyrics() {
+                    const currentTime = audio.currentTime;
+
+                    // Find the current lyric based on the timestamp
+                    while (currentLyricIndex < lyricsData.length - 1 &&
+                           currentTime >= timeToSeconds(lyricsData[currentLyricIndex + 1].time)) {
+                        currentLyricIndex++;
+                    }
+
+                    // Update the lyrics container with the current lyric
+                    if (currentLyricIndex < lyricsData.length) {
+                        lyricsContainer.innerText = lyricsData[currentLyricIndex].lyrics;
+                    }
+                }
+
+                // Attach the lyrics sync function to the audio's timeupdate event
+                audio.addEventListener('timeupdate', updateLyrics);
+            });
+        });
+    });
+    </script>
+</body>
+</html>
